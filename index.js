@@ -34,10 +34,7 @@ class Watcher extends events.EventEmitter {
 
     start() {
         var watcher = this;
-        fs.watchFile(watchDir, function() {
-            watcher.watch();
-        });
-
+        fs.watchFile( watchDir, function() { watcher.watch() } );
         ico.create(function(tray) {
             tray.setTitle('.MDMP Sniffer')
             // TODO: Change icon while upload is in progress 
@@ -54,18 +51,14 @@ let watcher = new Watcher(watchDir, processedDir);
 watcher.on("process", function process(file) {
     const watchFile = this.watchDir + "/" + file;
     const processedFile = this.processedDir + "/" + file.toLowerCase();
-    fs.copyFile(watchFile, processedFile, function(err) {
-      if (err) throw err;
-    });
+    fs.copyFile( watchFile, processedFile, function(err) { if (err) throw err } );
     // TODO: Upload mdmps somewhere, dump queue once uploaded
 });
 
 
 if (watchDir) {
-    if (!fs.existsSync(processedDir)){
-        fs.mkdirSync(processedDir);
-    }
-    watcher.start();
+    if ( !fs.existsSync(processedDir) ) { fs.mkdirSync(processedDir) }
+    watcher.start()
     console.log("Sniffing for juicy crash dumps [",watchDir + ' ]')
 } else {
     console.error("ERROR: could not locate your Garry's Mod install")
