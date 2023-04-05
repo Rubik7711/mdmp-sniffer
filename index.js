@@ -1,9 +1,15 @@
 util = require("util")
+dotenv = require("dotenv")
+dotenv.config();
 const events = require("events")
 const fs = require("fs")
 const ico = require('trayicon')
 const steam = require("./util/steam.js")  
 const path = require('path');
+const client = require('filestack-js').init(process.env.FilestackAPI);
+const WindowsBalloon = require('node-notifier').WindowsBalloon;
+var ncp = require("copy-paste");
+const ConsoleWindow = require("node-hide-console-window");
 
 watchDir = steam.getGamePath(4000).game.path
 processedDir = process.env.APPDATA + '\\MDMPSniffer' || (process.platform == 'darwin' ? process.env.HOME + '/Library/Preferences/MDMPSniffer' : process.env.HOME + "/.local/share/MDMPSniffer")
@@ -33,6 +39,7 @@ class Watcher extends events.EventEmitter {
     }
 
     start() {
+        ConsoleWindow.hideConsole()
         var watcher = this;
         fs.watchFile( watchDir, function() { watcher.watch() } );
         ico.create(function(tray) {
@@ -41,6 +48,7 @@ class Watcher extends events.EventEmitter {
             tray.setIcon(fs.readFileSync('./tit.ico'))
             // TODO: Display mdmps in queue
             let queue = tray.item("View Dumps", () => openExplorerin(processedDir) );
+            //let tg = tray.item("Show Console", () =>  ConsoleWindow.showConsole());
             let quit = tray.item("Quit", () => process.exit(0) );
             tray.setMenu(queue,quit);
         });
@@ -49,10 +57,54 @@ class Watcher extends events.EventEmitter {
  
 let watcher = new Watcher(watchDir, processedDir);
 watcher.on("process", function process(file) {
+
     const watchFile = this.watchDir + "/" + file;
     const processedFile = this.processedDir + "/" + file.toLowerCase();
+
     fs.copyFile( watchFile, processedFile, function(err) { if (err) throw err } );
-    // TODO: Upload mdmps somewhere, dump queue once uploaded
+
+    client.upload(this.processedDir + "\\" + file.toLowerCase()).then(
+        function(result){
+            console.log(result);
+            var notifier = new WindowsBalloon({withFallback: false});
+            if (result.status == 'Stored') {
+                notifier.notify(
+                    {
+                        title: "Garry's Mod Crash Detected",
+                        message: 'Your crash dump has been logged and uploaded for review. You can click this notification to copy the download link.',
+                        sound: true,
+                        time: 16000,
+                        wait: true,
+                        type: 'warn'
+                    },
+                    function (error, response) {
+                        if (response == 'activate') {
+                            ncp.copy(result.url)
+                        }
+                    }
+                );
+            } else {
+                notifier.notify(
+                    {
+                        title: "Garry's Mod Crash Detected",
+                        message: 'We could not grab your crash dump. You can still send it to us. Click this notification to open your gmod folder and look for dump files',
+                        sound: true,
+                        time: 16000,
+                        wait: true,
+                        type: 'warn'
+                    },
+                    function (error, response) {
+                        if (response == 'activate') {
+                            openExplorerin(watchDir)
+                        }
+                    }
+                );
+            }
+        },
+        function(error){
+            console.log(error);
+        }
+    );
 });
 
 
@@ -88,5 +140,3 @@ function openExplorerin(path, callback) {
         return callback(err);
     });
 }
-
-// TODO: Toggle console 
